@@ -1,0 +1,26 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Environments
+.venv/
+venv/
+env/
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Logs and runtime files
+*.log
+
+# Local configuration and secrets
+.env
+gen-lang-client.json
+
+# IDE/project files
+.idea/
+.vscode/
+

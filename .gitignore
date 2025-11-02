@@ -15,6 +15,7 @@ env/
 
 # Logs and runtime files
 *.log
+out/
 
 # Local configuration and secrets
 .env
@@ -23,4 +24,3 @@ gen-lang-client.json
 # IDE/project files
 .idea/
 .vscode/
-

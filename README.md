@@ -28,6 +28,14 @@ This repository hosts a Unix-style pipeline for processing scanned student tests
 - `--timeout FLOAT` – HTTP timeout in seconds (default 180).
 - `--usage-metadata` – Embed token usage in output metadata.
 
+### Evaluation Rubric
+The evaluator scores each essay on two criteria plus a total:
+- **Criterion 1 – Question Response Quality (0–5 points)**: How well the student addresses the prompt, stays on topic, and responds directly.
+- **Criterion 2 – Use of Evidence (0–5 points)**: Quality and relevance of supporting details or references to the reading material.
+- **Total Score (0–10 points)**: Sum of the two criteria. Downstream tools can map this to a letter grade (default scale in `report_results.py` is 10 points = A).
+
+`--material` / `--material-file` should supply the full reading passage or a detailed summary of the text the students were assessed on. `--question` / `--question-file` provides the actual test question (the prompt the essays respond to). Pairing both gives the evaluator enough context to judge whether the response matches the prompt.
+
 ## Stage 4 – Reporting (`report/report_results.py`)
 - `--input/-i PATH` – JSONL input (default stdin).
 - `--output/-o PATH` – JSONL passthrough output (default stdout).
@@ -43,6 +51,17 @@ This repository hosts a Unix-style pipeline for processing scanned student tests
 - `--subject TEXT` – Email subject (default “Your Evaluation from Mr. Cooper's AI Krew”).
 - `--greeting TEXT` – Greeting prefix (default “Hello”).
 - `--report PATH` – Save summary of ready/missing emails.
+
+### Mailing List Format
+Provide a UTF-8 CSV with headers `student-name,email-address`. The `student-name` must match the names carried through the pipeline (case-insensitive, spacing preserved). Example:
+
+```
+student-name,email-address
+john doe,john.doe@example.com
+jane doe,jane.doe@example.com
+```
+
+Hyphens, commas, and spacing are respected as written; ensure they line up with `student_name` values emitted by the evaluation/report stages.
 
 ## Stage 6 – SMTP Send (`mailroom/send_mail.py`)
 - `--input/-i PATH` – JSONL input (default stdin).
@@ -64,4 +83,3 @@ python batchocr/ocr_tests.py --input ~/Downloads/students.pdf \
 ```
 
 All scripts respect the shared `.env` in the repository root for credentials and defaults. Each stage prints concise start/finish messages to stderr so you can monitor progress while the JSON flows through stdout for further processing.
-

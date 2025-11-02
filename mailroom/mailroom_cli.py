@@ -209,6 +209,7 @@ def format_criterion(criterion: dict, score: Optional[float]) -> str:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     load_env_file(Path(args.env_file))
+    print("[mailroom] Preparing email payloads...", file=sys.stderr)
 
     try:
         roster = load_roster(Path(args.roster))
@@ -291,6 +292,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"Failed to write report file: {error}", file=sys.stderr)
 
     print(f"Processed {processed} records. Emails ready: {emails_ready}.", file=sys.stderr)
+    print("[mailroom] Email payload preparation complete.", file=sys.stderr)
     return 0
 
 

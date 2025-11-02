@@ -164,6 +164,7 @@ def resolve_attachments(record: dict, enable: bool) -> list[Path]:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     load_env_file(Path(args.env_file))
+    print("[send_mail] Starting SMTP delivery...", file=sys.stderr)
 
     try:
         smtp_settings = get_smtp_settings()
@@ -290,9 +291,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         f"Processed {processed}. Sent: {sent_count}. Skipped: {skipped_count}. Errors: {error_count}.",
         file=sys.stderr,
     )
+    print("[send_mail] SMTP delivery complete.", file=sys.stderr)
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
-

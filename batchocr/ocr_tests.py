@@ -298,6 +298,7 @@ def load_credentials_path() -> Path:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     load_env_file(ENV_FILE)
+    print("[batchocr] Starting OCR processing...", file=sys.stderr)
     args = parse_args(argv)
     language_hints = [hint.strip() for hint in args.language_hints.split(",") if hint.strip()]
     credentials_path = load_credentials_path()
@@ -343,6 +344,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if managed_output:
             output_stream.close()
 
+    print(f"[batchocr] Completed OCR processing (exit={exit_code}).", file=sys.stderr)
     return exit_code
 
 

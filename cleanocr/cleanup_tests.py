@@ -274,6 +274,7 @@ def resolve_output_stream(path: Optional[str]):
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     load_env_file(ENV_FILE)
+    print("[cleanocr] Starting cleanup...", file=sys.stderr)
     args = parse_args(argv)
 
     api_key = os.environ.get("XAI_API_KEY")
@@ -336,6 +337,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if managed_output:
             output_stream.close()
 
+    print(f"[cleanocr] Completed cleanup (exit={exit_code}).", file=sys.stderr)
     return exit_code
 
 

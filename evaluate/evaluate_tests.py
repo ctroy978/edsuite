@@ -340,6 +340,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
+    print("[evaluate] Starting evaluation...", file=sys.stderr)
     load_env_file(Path(args.env_file))
 
     try:
@@ -413,6 +414,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if managed_output:
             output_stream.close()
 
+    print(f"[evaluate] Completed evaluation (exit={exit_code}).", file=sys.stderr)
     if aggregated_usage:
         parts = []
         for key, value in aggregated_usage.items():

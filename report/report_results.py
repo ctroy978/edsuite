@@ -239,6 +239,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     load_env_file(Path(args.env_file))
+    print("[report] Starting report generation...", file=sys.stderr)
 
     csv_writer = None
     csv_file = None
@@ -317,6 +318,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     else:
         print("No evaluations processed.", file=sys.stderr)
 
+    print("[report] Report generation complete.", file=sys.stderr)
     return 0
 
 
@@ -328,4 +330,3 @@ def slugify(value: str) -> str:
 
 if __name__ == "__main__":
     sys.exit(main())
-

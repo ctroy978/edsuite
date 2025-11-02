@@ -1,6 +1,0 @@
-Processed records: 3
-Emails ready: 2
-Missing emails: 1
-  - Deegan
-a
-Invalid emails: 0

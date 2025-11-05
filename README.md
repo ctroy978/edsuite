@@ -63,7 +63,23 @@ jane doe,jane.doe@example.com
 
 Hyphens, commas, and spacing are respected as written; ensure they line up with `student_name` values emitted by the evaluation/report stages.
 
-## Stage 6 – SMTP Send (`mailroom/send_mail.py`)
+## Stage 6 – Name Review (`namecorrector/name_corrector.py`)
+- `--input/-i PATH` – JSONL input (default stdin).
+- `--output/-o PATH` – JSONL output (default stdout).
+- `--roster-file PATH` – Optional CSV/JSON with roster names/emails for suggested matches and automatic fills.
+- `--env-file PATH` – Path to the shared `.env` (default repo root).
+
+### Name Review Workflow
+The name corrector inspects each record for delivery issues (missing or invalid email, failed match). Only those records pause for review. For each flagged student it:
+
+- Displays the original student name, a short context snippet, and the upstream mail status.
+- Suggests up to three likely roster name matches (when a roster is supplied).
+- Lets the teacher enter a corrected name and, if necessary, supply an email manually.
+- Updates `student_name`, `email`, `mail.status`, and `metadata.name_corrector` to mark the correction source for downstream tools.
+
+When no records need attention the tool passes the stream through untouched.
+
+## Stage 7 – SMTP Send (`mailroom/send_mail.py`)
 - `--input/-i PATH` – JSONL input (default stdin).
 - `--output/-o PATH` – JSONL output (default stdout).
 - `--dry-run` – Log intended sends without contacting SMTP.
@@ -79,6 +95,7 @@ python batchocr/ocr_tests.py --input ~/Downloads/students.pdf \
   | ./evaluate/evaluate_tests.py --material-file ~/Downloads/material.txt --question-file ~/Downloads/questions.txt --context "10th-grade English" \
   | ./report/report_results.py --csv out/summary.csv --pdf-dir out/reports \
   | ./mailroom/mailroom_cli.py --roster ~/Downloads/mail.csv --report out/mailroom/payload_report.txt \
+  | ./namecorrector/name_corrector.py --roster-file ~/Downloads/mail.csv \
   | ./mailroom/send_mail.py --attach-report --report out/mailroom/send_report.txt
 ```
 

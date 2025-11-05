@@ -17,6 +17,10 @@ env/
 *.log
 out/
 
+# Local test data and scratch exports
+~/
+Downloads/
+
 # Local configuration and secrets
 .env
 gen-lang-client.json

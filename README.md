@@ -36,6 +36,139 @@ The evaluator scores each essay on two criteria plus a total:
 
 `--material` / `--material-file` should supply the full reading passage or a detailed summary of the text the students were assessed on. `--question` / `--question-file` provides the actual test question (the prompt the essays respond to). Pairing both gives the evaluator enough context to judge whether the response matches the prompt.
 
+## Rubrics for `evaluate_essay.py`
+
+`evaluate_essay.py` consumes a rubric JSON that tells the AI how to grade each essay. The file must include a top-level `rubric` object with the following structure:
+
+```json
+{
+  "rubric": {
+    "course": "WR 121 - College Composition",
+    "description": "Short description of what this rubric is for.",
+    "scale": {
+      "4": "Excellent",
+      "3": "Good",
+      "2": "Fair",
+      "1": "Poor"
+    },
+    "criteria": [
+      {
+        "name": "Thesis and Argument",
+        "description": "Evaluates clarity and strength of the central claim.",
+        "levels": [
+          { "score": 4, "label": "Excellent", "description": "..." },
+          { "score": 3, "label": "Good", "description": "..." },
+          { "score": 2, "label": "Fair", "description": "..." },
+          { "score": 1, "label": "Poor", "description": "..." }
+        ]
+      }
+      // 4–6 criteria total
+    ],
+    "total_points": 20
+  }
+}
+```
+
+Key requirements:
+
+- **`rubric`**: required top-level key.
+- **`rubric.course`**: non-empty string naming the course or assignment.
+- **`rubric.description`**: non-empty string describing what the rubric measures.
+- **`rubric.scale`**:
+  - Maps stringified scores `"1"`–`"4"` to labels (e.g., `"Poor"`, `"Fair"`, `"Good"`, `"Excellent"`).
+  - Scores must remain within the 1–4 range.
+- **`rubric.criteria`**:
+  - Non-empty list, typically 4–6 criteria.
+  - Each criterion needs a `name`, `description`, and `levels`.
+- **`levels`** (per criterion):
+  - `score`: integer 1–4.
+  - `label`: label for that score (falls back to `scale` if blank).
+  - `description`: clear explanation of the performance at that score.
+- **`rubric.total_points`**:
+  - Optional integer max score. If omitted, the tool defaults to `len(criteria) * 4`.
+
+Extra fields are allowed as long as the required structure is preserved. For example, adding a new criterion such as Refutation works when it follows the same pattern:
+
+```json
+{
+  "name": "Refutation and Counterargument",
+  "description": "Evaluates how well the writer anticipates and responds to opposing views.",
+  "levels": [
+    { "score": 4, "label": "Excellent", "description": "..." },
+    { "score": 3, "label": "Good", "description": "..." },
+    { "score": 2, "label": "Fair", "description": "..." },
+    { "score": 1, "label": "Poor", "description": "..." }
+  ]
+}
+```
+
+Teachers are free to add, rename, or revise criteria as needed—just keep the number of criteria in the expected range (unless the CLI is updated) and ensure each `levels` block still covers the 1–4 scale. `evaluate_essay.py` uses these criterion names to align scores in its JSONL output.
+
+## Running `evaluate_essay.py`
+
+`evaluate_essay.py` ingests PDF essays (from a folder or ZIP), applies the rubric above, and emits JSONL plus an optional PDF summary. Basic usage:
+
+```bash
+python evaluate/evaluate_essay.py \
+  --input-path path/to/essays/ \
+  --rubric-file path/to/WR121_Rubric.json \
+  --output evaluations.jsonl
+```
+
+Main flags:
+
+- `--input-path/-i PATH`
+  - Directory with `.pdf` files or a `.zip` containing PDFs. Each PDF becomes one essay.
+- `--rubric-file PATH`
+  - Path to the rubric JSON file described earlier.
+- `--output/-o PATH`
+  - Optional JSONL destination. Omit to stream to stdout.
+- `--pdf-report PATH`
+  - Optional path for a single instructor-facing PDF summarizing every evaluation.
+- `--model NAME`
+  - Optional Grok model override (default matches the script constant, e.g., `grok-4-fast-reasoning`).
+- `--max-batch-tokens INT`
+  - Approximate token budget for each batch of essays.
+- `--max-batch-size INT`
+  - Maximum essays per batch sent to the model.
+- `--timeout FLOAT`
+  - HTTP timeout in seconds.
+- `--env-file PATH`
+  - Points to a `.env` with `XAI_API_KEY` and related settings (defaults to repo root `.env`).
+- `--usage-metadata`
+  - When set, attaches token usage under `metadata.evaluation_usage` for each JSONL record.
+
+Example commands:
+
+1. **Directory of PDFs, rubric, JSONL to stdout**
+
+   ```bash
+   python evaluate/evaluate_essay.py \
+     --input-path essays/ \
+     --rubric-file rubrics/WR121_Rubric.json
+   ```
+
+2. **ZIP of essays, JSONL + PDF report on disk**
+
+   ```bash
+   python evaluate/evaluate_essay.py \
+     --input-path uploads/essays_batch1.zip \
+     --rubric-file rubrics/WR121_Rubric.json \
+     --output out/evaluations_WR121_batch1.jsonl \
+     --pdf-report out/WR121_batch1_report.pdf
+   ```
+
+The JSONL output includes:
+
+- `student_name`
+- `file_name`
+- `summary`
+- `rubric_scores` (one entry per rubric criterion with scores, labels, explanations, evidence)
+- `total_score` and `max_score`
+- `overall_comment`
+- `improvement_tutorial` (advice plus original/improved excerpts)
+- `metadata` (rubric info, optional usage data, etc.)
+
 ## Stage 4 – Reporting (`report/report_results.py`)
 - `--input/-i PATH` – JSONL input (default stdin).
 - `--output/-o PATH` – JSONL passthrough output (default stdout).

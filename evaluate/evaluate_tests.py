@@ -98,6 +98,9 @@ def build_prompt_header(material: str, question: str, context: str) -> str:
         "You are an AI evaluator for 10th-grade high school essays on various literature topics. "
         "Evaluate each essay based on the provided reading material, question, and context. "
         "Account for potential OCR artifacts (minor misspellings or garbled words) without inventing new content.\n\n"
+        "There are two grading criteria that must be scored 1-5 for every essay:\n"
+        "  • Criterion 1 — Content/Argumentation: How well the essay addresses the question and uses evidence from the material.\n"
+        "  • Criterion 2 — Clarity/Organization: How clearly the essay is structured and expressed.\n\n"
         f"Reading Material:\n{material}\n\n"
         f"Test Question:\n{question}\n\n"
         f"Context:\n{context}\n\n"
@@ -196,8 +199,8 @@ def assemble_prompt(header: str, batch: List[Submission]) -> str:
         "{\n"
         '  "student_name": "...",\n'
         '  "summary": "1-2 sentence summary",\n'
-        '  "criterion_1": {"explanation": "...", "score": 1-5},\n'
-        '  "criterion_2": {"explanation": "...", "score": 1-5},\n'
+        '  "criterion_1": {"name": "Content/Argumentation", "explanation": "...", "score": 1-5},\n'
+        '  "criterion_2": {"name": "Clarity/Organization", "explanation": "...", "score": 1-5},\n'
         '  "total_score": integer sum of criteria,\n'
         '  "overall_comment": "1-2 sentence holistic comment"\n'
         "}\n\nReturn a JSON array covering all essays."

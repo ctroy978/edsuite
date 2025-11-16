@@ -107,7 +107,6 @@ def load_roster(csv_path: Path) -> Dict[str, str]:
         if {"student-name", "email-address"} - set(normalized_fieldnames):
             raise ValueError("Roster CSV must include 'student-name' and 'email-address' columns.")
 
-        # Map original column names to normalized names for access
         columns = {name.strip().lower(): name for name in reader.fieldnames or []}
         name_key = columns["student-name"]
         email_key = columns["email-address"]
@@ -134,7 +133,15 @@ def first_name(student_name: str) -> str:
     return parts[0] if parts else student_name.strip() or "Student"
 
 
-def compose_email_body(
+def detect_schema(record: dict) -> str:
+    if isinstance(record.get("evaluation"), dict):
+        return "tests"
+    if "rubric_scores" in record or "report_summary" in record:
+        return "essay"
+    return "unknown"
+
+
+def compose_email_body_tests(
     *,
     student_name: str,
     greeting: str,
@@ -170,6 +177,118 @@ def compose_email_body(
         "Best,",
         "Mr. Cooper's AI Krew",
     ]
+    return "\n".join(lines)
+
+
+def compose_email_body_essay(
+    *,
+    student_name: str,
+    greeting: str,
+    record: dict,
+) -> str:
+    summary = record.get("summary") or "No summary provided."
+    report_summary = record.get("report_summary") if isinstance(record.get("report_summary"), dict) else {}
+    total_score = report_summary.get("total_score")
+    max_score = report_summary.get("max_score")
+    final_grade = report_summary.get("final_grade")
+    overall_comment = record.get("overall_comment") or "No overall comment provided."
+    rubric_scores = record.get("rubric_scores") if isinstance(record.get("rubric_scores"), list) else []
+    improvement = record.get("improvement_tutorial") if isinstance(record.get("improvement_tutorial"), dict) else {}
+
+    overall_line = None
+    if total_score is not None or max_score is not None or final_grade:
+        score_text = []
+        if total_score is not None:
+            if max_score:
+                score_text.append(f"{total_score:g} / {max_score:g}")
+            else:
+                score_text.append(f"{total_score:g}")
+        elif max_score:
+            score_text.append(f"Max Score: {max_score:g}")
+        if final_grade:
+            if score_text:
+                score_text.append(f"({final_grade})")
+            else:
+                score_text.append(f"Grade: {final_grade}")
+        overall_line = "Overall Score: " + " ".join(score_text)
+
+    lines = [
+        f"{greeting} {first_name(student_name)},",
+        "",
+        "Mr. Cooper's AI Krew has reviewed your work. Here is your evaluation:",
+        "",
+        "Summary:",
+        summary,
+    ]
+    if overall_line:
+        lines.extend(["", overall_line])
+    lines.extend(["", "Rubric Feedback:"])
+
+    if rubric_scores:
+        for entry in rubric_scores:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("criterion_name") or entry.get("name") or "Criterion"
+            score = entry.get("score")
+            label = entry.get("label")
+            explanation = entry.get("explanation") or "No explanation provided."
+            max_per = entry.get("max_score") or 4
+            lines.extend(
+                [
+                    "",
+                    f"Criterion: {name}",
+                ]
+            )
+            if score is not None:
+                if max_per:
+                    lines.append(f"Score: {score} / {max_per}{f' ({label})' if label else ''}")
+                else:
+                    lines.append(f"Score: {score}{f' ({label})' if label else ''}")
+            elif label:
+                lines.append(f"Rating: {label}")
+            lines.append(f"Explanation: {explanation}")
+    else:
+        lines.extend(
+            [
+                "",
+                "No rubric criteria were provided in this evaluation.",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "Overall Comment:",
+            overall_comment,
+        ]
+    )
+
+    advice = improvement.get("advice")
+    example = improvement.get("example_from_essay")
+    improved_example = improvement.get("improved_example")
+    if advice or example or improved_example:
+        lines.extend(
+            [
+                "",
+                "How to Improve:",
+            ]
+        )
+        if advice:
+            lines.append(f"Advice: {advice}")
+        if example:
+            lines.append(f"From your essay: {example}")
+        if improved_example:
+            lines.append(f"Improved example: {improved_example}")
+
+    lines.extend(
+        [
+            "",
+            "If you have any questions, please talk with your teacher.",
+            "",
+            "Best,",
+            "Mr. Cooper's AI Krew",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -232,11 +351,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 print("Skipping record without student_name.", file=sys.stderr)
                 continue
 
-            evaluation = record.get("evaluation")
-            if not isinstance(evaluation, dict):
-                print(f"Skipping {student_name}: missing evaluation payload.", file=sys.stderr)
-                continue
-
             roster_key = normalize_name(student_name)
             email = roster.get(roster_key)
             status: str
@@ -253,11 +367,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 status = "ready"
                 emails_ready += 1
 
-            body = compose_email_body(
-                student_name=student_name,
-                greeting=args.greeting,
-                evaluation=evaluation,
-            )
+            schema = detect_schema(record)
+            if schema == "tests":
+                evaluation = record.get("evaluation") or {}
+                body = compose_email_body_tests(
+                    student_name=student_name,
+                    greeting=args.greeting,
+                    evaluation=evaluation,
+                )
+            elif schema == "essay":
+                body = compose_email_body_essay(
+                    student_name=student_name,
+                    greeting=args.greeting,
+                    record=record,
+                )
+            else:
+                print(f"Skipping {student_name}: unsupported evaluation schema.", file=sys.stderr)
+                continue
 
             mail_payload = {
                 "to": email,

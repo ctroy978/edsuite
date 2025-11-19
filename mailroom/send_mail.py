@@ -5,6 +5,8 @@ Send transactional emails using Brevo SMTP based on JSONL mail payloads.
 Expected input records contain a `mail` object produced by `mailroom_cli.py`.
 This script sends messages for entries whose `mail.status` is "ready" and writes
 an updated JSON stream downstream so additional tooling can continue to operate.
+The input can be a single JSONL file, stdin, or a directory containing JSONL
+batches (processed in alphabetical order).
 
 Example:
     python .../mailroom/mailroom_cli.py --roster roster.csv \\
@@ -79,22 +81,52 @@ def get_smtp_settings() -> Dict[str, str]:
     return settings
 
 
+def _iter_records_from_stream(source: Iterable[str]) -> Iterator[dict]:
+    for raw_line in source:
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            print(f"Skipping invalid JSON line: {error}: {line}", file=sys.stderr)
+            continue
+        if isinstance(record, dict):
+            yield record
+        else:
+            print("Skipping non-object JSON entry", file=sys.stderr)
+
+
 def iter_json_records(path: str) -> Iterator[dict]:
-    source = sys.stdin if path == "-" else open(path, "r", encoding="utf-8")
-    with source:
-        for raw_line in source:
-            line = raw_line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as error:
-                print(f"Skipping invalid JSON line: {error}: {line}", file=sys.stderr)
-                continue
-            if isinstance(record, dict):
-                yield record
-            else:
-                print("Skipping non-object JSON entry", file=sys.stderr)
+    if path == "-":
+        yield from _iter_records_from_stream(sys.stdin)
+        return
+
+    input_path = Path(path)
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input path not found: {input_path}")
+
+    if input_path.is_file():
+        with input_path.open("r", encoding="utf-8") as source:
+            yield from _iter_records_from_stream(source)
+        return
+
+    if input_path.is_dir():
+        jsonl_files = sorted(
+            file_path
+            for file_path in input_path.iterdir()
+            if file_path.is_file() and file_path.suffix.lower() == ".jsonl"
+        )
+        if not jsonl_files:
+            print(f"No JSONL files found in directory: {input_path}", file=sys.stderr)
+            return
+        for file_path in jsonl_files:
+            print(f"[send_mail] Reading {file_path}", file=sys.stderr)
+            with file_path.open("r", encoding="utf-8") as source:
+                yield from _iter_records_from_stream(source)
+        return
+
+    raise ValueError(f"Unsupported input path type: {input_path}")
 
 
 def build_message(
@@ -128,7 +160,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         description="Send emails via Brevo SMTP using JSONL mail payloads.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--input", "-i", default="-", help="JSONL input or '-' for stdin")
+    parser.add_argument(
+        "--input",
+        "-i",
+        default="-",
+        help="JSONL file, directory of JSONL files, or '-' for stdin",
+    )
     parser.add_argument("--output", "-o", default=None, help="JSONL output (default: stdout)")
     parser.add_argument("--env-file", default=str(ENV_FILE), help="Path to shared .env file with SMTP credentials")
     parser.add_argument("--dry-run", action="store_true", help="Log intended sends without contacting SMTP")

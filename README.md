@@ -213,7 +213,7 @@ The name corrector inspects each record for delivery issues (missing or invalid 
 When no records need attention the tool passes the stream through untouched.
 
 ## Stage 7 – SMTP Send (`mailroom/send_mail.py`)
-- `--input/-i PATH` – JSONL input (default stdin).
+- `--input/-i PATH` – JSONL file, directory of JSONL files, or `-` for stdin.
 - `--output/-o PATH` – JSONL output (default stdout).
 - `--dry-run` – Log intended sends without contacting SMTP.
 - `--rate-limit FLOAT` – Delay between sends (default 0.5s).

@@ -332,7 +332,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--question-file", dest="question_file", default=None, help="Path to essay question text/PDF")
     parser.add_argument("--context", default="", help="Additional context string for the evaluator")
     parser.add_argument("--context-file", dest="context_file", default=None, help="Path to context text/PDF")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="xAI Grok model name")
+    parser.add_argument("--model", default=None, help="xAI Grok model name")
     parser.add_argument("--max-batch-tokens", type=int, default=DEFAULT_MAX_BATCH_TOKENS, help="Approximate token budget per batch")
     parser.add_argument("--max-batch-size", type=int, default=DEFAULT_MAX_BATCH_SIZE, help="Maximum number of essays per batch")
     parser.add_argument("--timeout", type=float, default=180.0, help="HTTP timeout (seconds)")
@@ -371,7 +371,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     managed_output = output_stream is not sys.stdout
 
     api_base_url = os.environ.get("XAI_BASE_URL", API_BASE_URL)
-    client = EvaluationClient(api_key, model=args.model, timeout=args.timeout, base_url=api_base_url)
+    model_name = args.model or os.environ.get("XAI_EVALUATE_MODEL") or DEFAULT_MODEL
+    client = EvaluationClient(api_key, model=model_name, timeout=args.timeout, base_url=api_base_url)
     exit_code = 0
     aggregated_usage: Dict[str, float] = {}
 

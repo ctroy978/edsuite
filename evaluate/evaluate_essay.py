@@ -646,7 +646,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--rubric-file", required=True, help="Path to rubric JSON (e.g., WR121_Rubric.json)")
     parser.add_argument("--output", "-o", default=None, help="Optional JSONL output path (default stdout)")
     parser.add_argument("--pdf-report", default=None, help="Optional path to save a human-readable PDF summary")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="xAI Grok model name")
+    parser.add_argument("--model", default=None, help="xAI Grok model name")
     parser.add_argument("--max-batch-tokens", type=int, default=DEFAULT_MAX_BATCH_TOKENS, help="Approximate token budget per batch")
     parser.add_argument("--max-batch-size", type=int, default=DEFAULT_MAX_BATCH_SIZE, help="Maximum essays per batch")
     parser.add_argument("--timeout", type=float, default=180.0, help="HTTP timeout (seconds)")
@@ -696,7 +696,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     managed_output = output_stream is not sys.stdout
 
     api_base_url = os.environ.get("XAI_BASE_URL", API_BASE_URL)
-    client = EvaluationClient(api_key, model=args.model, timeout=args.timeout, base_url=api_base_url)
+    model_name = args.model or os.environ.get("XAI_EVALUATE_MODEL") or DEFAULT_MODEL
+    client = EvaluationClient(api_key, model=model_name, timeout=args.timeout, base_url=api_base_url)
     exit_code = 1 if had_read_errors else 0
     aggregated_usage: Dict[str, float] = {}
     results: List[Dict[str, Any]] = []

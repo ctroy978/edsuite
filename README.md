@@ -126,7 +126,7 @@ Main flags:
 - `--pdf-report PATH`
   - Optional path for a single instructor-facing PDF summarizing every evaluation.
 - `--model NAME`
-  - Optional Grok model override (default matches the script constant, e.g., `grok-4-fast-reasoning`).
+  - Optional Grok model override (defaults to `XAI_EVALUATE_MODEL` env var or the script constant, e.g., `grok-4-fast-reasoning`).
 - `--max-batch-tokens INT`
   - Approximate token budget for each batch of essays.
 - `--max-batch-size INT`

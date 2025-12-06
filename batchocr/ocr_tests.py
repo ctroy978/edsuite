@@ -29,7 +29,7 @@ from pdf2image import convert_from_bytes, convert_from_path
 
 
 NAME_HEADER_PATTERN = regex.compile(
-    r"(?im)^\s*name\s*[:\-]\s*([\p{L}][\p{L}'-]*(?:\s+[\p{L}][\p{L}'-]*)?)"
+    r"(?im)^\s*(?:name|id)\s*[:\-]\s*([\p{L}][\p{L}'-]*(?:\s+[\p{L}][\p{L}'-]*)?)"
 )
 
 ROOT_DIR = Path(__file__).resolve().parent.parent

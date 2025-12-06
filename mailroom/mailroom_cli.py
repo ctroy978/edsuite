@@ -128,6 +128,19 @@ def validate_email(email: str) -> bool:
     return bool(EMAIL_REGEX.match(email))
 
 
+def first_name_from_email(email: str) -> Optional[str]:
+    local_part, _, _domain = email.partition("@")
+    local_part = local_part.strip()
+    if not local_part:
+        return None
+    first, _, _rest = local_part.partition(".")
+    first = first.strip().replace("-", " ").replace("_", " ")
+    if not first:
+        return None
+    cleaned = first.strip()
+    return cleaned.capitalize() if cleaned else None
+
+
 def first_name(student_name: str) -> str:
     parts = student_name.strip().split()
     return parts[0] if parts else student_name.strip() or "Student"
@@ -146,6 +159,7 @@ def compose_email_body_tests(
     student_name: str,
     greeting: str,
     evaluation: dict,
+    salutation_name: Optional[str] = None,
 ) -> str:
     summary = evaluation.get("summary") or "No summary provided."
     criterion_1 = evaluation.get("criterion_1") or {}
@@ -154,9 +168,10 @@ def compose_email_body_tests(
 
     crit1_score = extract_score(criterion_1)
     crit2_score = extract_score(criterion_2)
+    salutation = salutation_name or first_name(student_name)
 
     lines = [
-        f"{greeting} {first_name(student_name)},",
+        f"{greeting} {salutation},",
         "",
         "Mr. Cooper's AI Krew has reviewed your work. Here is your evaluation:",
         "",
@@ -185,6 +200,7 @@ def compose_email_body_essay(
     student_name: str,
     greeting: str,
     record: dict,
+    salutation_name: Optional[str] = None,
 ) -> str:
     summary = record.get("summary") or "No summary provided."
     report_summary = record.get("report_summary") if isinstance(record.get("report_summary"), dict) else {}
@@ -212,8 +228,10 @@ def compose_email_body_essay(
                 score_text.append(f"Grade: {final_grade}")
         overall_line = "Overall Score: " + " ".join(score_text)
 
+    salutation = salutation_name or first_name(student_name)
+
     lines = [
-        f"{greeting} {first_name(student_name)},",
+        f"{greeting} {salutation},",
         "",
         "Mr. Cooper's AI Krew has reviewed your work. Here is your evaluation:",
         "",
@@ -353,6 +371,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
             roster_key = normalize_name(student_name)
             email = roster.get(roster_key)
+            salutation_name = first_name(student_name)
             status: str
             if email is None:
                 status = "no_email"
@@ -366,6 +385,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             else:
                 status = "ready"
                 emails_ready += 1
+                derived_name = first_name_from_email(email)
+                if derived_name:
+                    salutation_name = derived_name
 
             schema = detect_schema(record)
             if schema == "tests":
@@ -374,12 +396,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     student_name=student_name,
                     greeting=args.greeting,
                     evaluation=evaluation,
+                    salutation_name=salutation_name,
                 )
             elif schema == "essay":
                 body = compose_email_body_essay(
                     student_name=student_name,
                     greeting=args.greeting,
                     record=record,
+                    salutation_name=salutation_name,
                 )
             else:
                 print(f"Skipping {student_name}: unsupported evaluation schema.", file=sys.stderr)

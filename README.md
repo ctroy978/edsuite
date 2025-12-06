@@ -158,6 +158,16 @@ Example commands:
      --pdf-report out/WR121_batch1_report.pdf
    ```
 
+### Ensuring `student_name` detection
+
+`evaluate_essay.py` cannot ask upstream stages for names, so it infers each `student_name` using three simple heuristics. To make sure the right name is captured, do **at least one** of the following when preparing each PDF:
+
+1. Put the student's name on the first page with a clear `Name: Jane Doe` label (top margin is ideal). The script scans the first few non-empty lines and immediately uses anything after `Name:`.
+2. If no label is available, ensure one of the first short lines contains a capitalized first-and-last name (e.g., `Jane Doe`). The CLI searches those early lines for a `First Last` pattern and adopts the first match.
+3. As a fallback, the filename (minus extension) becomes the name after replacing `_`/`-` with spaces. Save files as `Jane_Doe.pdf` or `Jane-Doe.pdf` so this guess stays accurate if the PDF text is missing or messy.
+
+Following one of the above keeps downstream reports, mail-merges, and roster matching aligned with the actual student.
+
 The JSONL output includes:
 
 - `student_name`

@@ -31,6 +31,7 @@ from pdf2image import convert_from_bytes, convert_from_path
 NAME_HEADER_PATTERN = regex.compile(
     r"(?im)^\s*(?:name|id)\s*[:\-]\s*([\p{L}][\p{L}'-]*(?:\s+[\p{L}][\p{L}'-]*)?)"
 )
+CONTINUE_HEADER_PATTERN = regex.compile(r"(?im)^\s*continue\s*[:\-]\s*(.+)$")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT_DIR / ".env"
@@ -41,6 +42,7 @@ class PageResult:
     number: int
     text: str
     detected_name: Optional[str]
+    continuation_name: Optional[str]
 
 
 @dataclass
@@ -52,7 +54,10 @@ class TestAggregate:
 
     def append_page(self, text: str, page_number: int) -> None:
         self.parts.append(text)
-        self.end_page = page_number
+        if page_number < self.start_page:
+            self.start_page = page_number
+        if page_number > self.end_page:
+            self.end_page = page_number
 
     def to_json_record(self, original_pdf: str) -> dict:
         return {
@@ -111,6 +116,15 @@ def detect_name(text: str) -> Optional[str]:
     # Limit search to the first ~10 lines to reduce false positives deeper in the page.
     top_section = "\n".join(text.splitlines()[:10])
     match = NAME_HEADER_PATTERN.search(top_section)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
+def detect_continuation_name(text: str) -> Optional[str]:
+    """Detect CONTINUE markers that reference the original student name."""
+    top_section = "\n".join(text.splitlines()[:10])
+    match = CONTINUE_HEADER_PATTERN.search(top_section)
     if match:
         return match.group(1).strip()
     return None
@@ -175,7 +189,10 @@ def ocr_pdf(
         response = client.document_text(buffer.getvalue())
         text = extract_text(response)
         name = detect_name(text)
-        results.append(PageResult(number=index, text=text, detected_name=name))
+        continuation = detect_continuation_name(text)
+        results.append(
+            PageResult(number=index, text=text, detected_name=name, continuation_name=continuation)
+        )
     return results
 
 
@@ -183,8 +200,44 @@ def aggregate_tests(pages: Iterable[PageResult], *, unknown_prefix: str = "Unkno
     aggregates: list[TestAggregate] = []
     current: Optional[TestAggregate] = None
     unknown_counter = 0
+    aggregates_by_name: dict[str, TestAggregate] = {}
+    pending_by_name: dict[str, list[PageResult]] = {}
+
+    def normalize_name(name: Optional[str]) -> Optional[str]:
+        if not name:
+            return None
+        collapsed = regex.sub(r"\s+", " ", name).strip()
+        if not collapsed:
+            return None
+        return collapsed.casefold()
+
+    def attach_pending(name_key: Optional[str], aggregate: TestAggregate) -> None:
+        if not name_key:
+            return
+        pending_pages = pending_by_name.pop(name_key, [])
+        for pending_page in sorted(pending_pages, key=lambda item: item.number):
+            aggregate.append_page(pending_page.text, pending_page.number)
 
     for page in pages:
+        if page.continuation_name:
+            continuation_key = normalize_name(page.continuation_name)
+            target = aggregates_by_name.get(continuation_key) if continuation_key else None
+            if target is not None:
+                target.append_page(page.text, page.number)
+            else:
+                if continuation_key:
+                    pending_by_name.setdefault(continuation_key, []).append(page)
+                else:
+                    unknown_counter += 1
+                    aggregate = TestAggregate(
+                        student_name=f"{unknown_prefix} {unknown_counter:02d}",
+                        start_page=page.number,
+                        end_page=page.number,
+                        parts=[page.text],
+                    )
+                    aggregates.append(aggregate)
+            continue
+
         if page.detected_name:
             if current is not None:
                 aggregates.append(current)
@@ -194,6 +247,10 @@ def aggregate_tests(pages: Iterable[PageResult], *, unknown_prefix: str = "Unkno
                 end_page=page.number,
                 parts=[page.text],
             )
+            name_key = normalize_name(page.detected_name)
+            if name_key:
+                aggregates_by_name[name_key] = current
+                attach_pending(name_key, current)
             continue
 
         if current is None:
@@ -209,6 +266,22 @@ def aggregate_tests(pages: Iterable[PageResult], *, unknown_prefix: str = "Unkno
 
     if current is not None:
         aggregates.append(current)
+
+    for pending_key, pending_pages in pending_by_name.items():
+        pending_pages.sort(key=lambda item: item.number)
+        continuation_label = pending_pages[0].continuation_name
+        if not continuation_label:
+            unknown_counter += 1
+            continuation_label = f"{unknown_prefix} {unknown_counter:02d}"
+        aggregate = TestAggregate(
+            student_name=continuation_label,
+            start_page=pending_pages[0].number,
+            end_page=pending_pages[0].number,
+            parts=[],
+        )
+        for pending_page in pending_pages:
+            aggregate.append_page(pending_page.text, pending_page.number)
+        aggregates.append(aggregate)
     return aggregates
 
 

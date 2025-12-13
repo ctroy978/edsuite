@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
 import sys
 import tempfile
@@ -36,11 +35,9 @@ DEFAULT_MAX_BATCH_TOKENS = 12000
 DEFAULT_MAX_BATCH_SIZE = 5
 TOKEN_ESTIMATE_CHAR_RATIO = 4
 
-NAME_PATTERN = re.compile(r"\b([A-Z][a-z]+(?:[-'][A-Za-z]+)?)\s+([A-Z][a-z]+(?:[-'][A-Za-z]+)?)\b")
-
 OUTPUT_INSTRUCTIONS = """Respond with a single JSON array. Each element must have this exact structure:
 {
-  "student_name": "Full name or identifier from the essay",
+  "student_name": "Use EXACTLY the student name provided for this essay (derived from the filename)",
   "file_name": "original filename",
   "summary": "1-3 sentence description of the thesis/topic.",
   "rubric_scores": [
@@ -62,6 +59,7 @@ OUTPUT_INSTRUCTIONS = """Respond with a single JSON array. Each element must hav
   }
 }
 Rules:
+- Never infer or extract a student name from essay text; always echo the provided student identifier.
 - Evaluate each criterion independently on a 1-4 scale (1=Poor, 4=Excellent).
 - Use ONLY the rubric definitions; do not invent content not found in the essay.
 - Every rubric_score entry must include an evidence quote from the essay text.
@@ -251,30 +249,17 @@ def extract_zip_pdfs(zip_path: Path) -> Tuple[List[Path], tempfile.TemporaryDire
 
 
 def guess_student_name(path: Path, text: str) -> str:
-    base_name = path.stem.replace("_", " ").replace("-", " ").strip() or path.stem
-    candidate = base_name or "Unknown Student"
-    if not text:
-        return candidate
-    lines: List[str] = []
-    for raw_line in text.splitlines():
-        stripped = raw_line.strip()
-        if stripped:
-            lines.append(stripped)
-        if len(lines) >= 8:
-            break
-    for line in lines:
-        lowered = line.lower()
-        if lowered.startswith("name:"):
-            extracted = line.split(":", 1)[1].strip()
-            if extracted:
-                return extracted
-    for line in lines:
-        if len(line) > 60:
-            continue
-        match = NAME_PATTERN.search(line)
-        if match:
-            return " ".join(match.groups())
-    return candidate or "Unknown Student"
+    """Derive the student name purely from the filename (e.g., 'first last.pdf')."""
+
+    del text  # filenames now define the student identity
+
+    base_name = path.stem.replace("_", " ").replace("-", " ").strip()
+    parts = [part for part in base_name.split() if part]
+    if len(parts) >= 2:
+        return f"{parts[0]} {parts[1]}"
+    if parts:
+        return parts[0]
+    return "Unknown Student"
 
 
 def build_submissions(pdf_paths: List[Path]) -> Tuple[List[Submission], bool]:
@@ -457,11 +442,13 @@ def match_evaluation(
     used_indices: set[int],
 ) -> Optional[Dict[str, Any]]:
     target_name = (submission.student_name or "").strip().lower()
+    target_file = submission.file_name.strip().lower()
     for idx, item in enumerate(evaluations):
         if idx in used_indices:
             continue
         candidate = str(item.get("student_name", "")).strip().lower()
-        if candidate and candidate == target_name:
+        candidate_file = str(item.get("file_name", "")).strip().lower()
+        if (candidate and candidate == target_name) or (candidate_file and candidate_file == target_file):
             used_indices.add(idx)
             return item
     for idx, item in enumerate(evaluations):
@@ -521,7 +508,7 @@ def build_result_record(
     rubric: Rubric,
 ) -> Dict[str, Any]:
     evaluation = evaluation or {}
-    student_name = str(evaluation.get("student_name") or submission.student_name).strip() or submission.student_name
+    student_name = submission.student_name
     summary = str(evaluation.get("summary") or "").strip()
     normalized_scores = normalize_rubric_scores(rubric, evaluation.get("rubric_scores"))
     total_score = evaluation.get("total_score")

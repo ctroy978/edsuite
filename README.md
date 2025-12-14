@@ -10,6 +10,27 @@ This repository hosts a Unix-style pipeline for processing scanned student tests
 - `--language-hints` – Comma-separated Vision hints (`en,es`).
 - `--unknown-label` – Prefix when no name is detected (default `Unknown Student`).
 
+### Alternate Stage 1 – Qwen OCR (`openocr/ocr_tests.py`)
+This CLI mirrors the Google-based batchocr workflow but swaps the OCR backend for Qwen (via OpenRouter). It reads `QWEN_API_KEY` and `QWEN_API_MODEL` from `.env` or the environment before sending each rasterized page for transcription.
+
+- `--input/-i PATH` – PDF file, directory, or `-` for stdin (paths or raw PDF bytes).
+- `--output/-o PATH` – JSONL output destination (default stdout).
+- `--dpi INT` – Rasterization DPI passed to pdf2image (default 220).
+- `--jpeg-quality INT` – JPEG quality for intermediate JPEGs (default 70).
+- `--unknown-label TEXT` – Prefix for unidentified tests (default `Unknown Student`).
+- `--prompt TEXT` – Instruction prepended to each image request (defaults to a generic transcription prompt; customize for handwriting emphasis).
+- `--max-tokens INT` – Token cap for Qwen responses (default 2048).
+- `--temperature FLOAT` – Qwen temperature (default 0.1 for deterministic OCR).
+- `--api-url URL` – Override the OpenRouter endpoint (default `https://openrouter.ai/api/v1/chat/completions`).
+
+Usage mirrors batchocr; for example:
+
+```bash
+cat scanned.pdf | python openocr/ocr_tests.py --prompt "Transcribe all handwriting verbatim"
+```
+
+Ensure the repository `.env` contains valid `QWEN_API_KEY` and `QWEN_API_MODEL` entries before running.
+
 ## Stage 2 – Cleanup (`cleanocr/cleanup_tests.py`)
 - `--input/-i PATH` – JSONL input (default stdin).
 - `--output/-o PATH` – JSONL output (default stdout).

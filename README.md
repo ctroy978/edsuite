@@ -57,6 +57,25 @@ The evaluator scores each essay on two criteria plus a total:
 
 `--material` / `--material-file` should supply the full reading passage or a detailed summary of the text the students were assessed on. `--question` / `--question-file` provides the actual test question (the prompt the essays respond to). Pairing both gives the evaluator enough context to judge whether the response matches the prompt.
 
+### Alternate Stage 3 – Full Text Attachments (`evaluate/evaluate_fulltext.py`)
+When the reading passage is too long to inline into the prompt, use `evaluate_fulltext.py`. It mirrors `evaluate_tests.py` but uploads the full PDF/TXT source files to the xAI Files API and references them in every batch.
+
+- `--materials-path PATH` – **Required.** File or directory containing the full reading material to upload; directories are uploaded recursively and deleted after the run.
+- `--question/--question-file` and `--context/--context-file` – Same as `evaluate_tests.py`, but the prompt reminds the model that evidence lives in the attachments.
+- `--no-encrypted-content` – Optional switch to fall back to standard chats if your SDK/server does not support encrypted content.
+- All other batching, model, timeout, env, and usage flags are identical to `evaluate_tests.py`.
+
+Example: keep PDFs on disk while evaluating cleaned essays streaming from stdin:
+
+```bash
+python evaluate/evaluate_fulltext.py \
+  --materials-path curriculum/Unit4/ReadingPack/ \
+  --question-file prompts/unit4_question.txt \
+  --context "Honors section rubric emphasis on textual citations." \
+  --max-batch-tokens 10000 \
+  --usage-metadata
+```
+
 ## Rubrics for `evaluate_essay.py`
 
 `evaluate_essay.py` consumes a rubric JSON that tells the AI how to grade each essay. The file must include a top-level `rubric` object with the following structure:
